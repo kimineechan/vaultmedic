@@ -47,7 +47,7 @@ Prerequisites:
 - platform prerequisites required by Electron packaging
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/vaultmedic.git
+git clone https://github.com/kimineechan/vaultmedic.git
 cd vaultmedic
 npm ci
 npm run dev
