@@ -1,0 +1,64 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run package:win
+
+      - name: Create unpacked Windows fallback
+        shell: pwsh
+        run: |
+          $version = node -p "require('./package.json').version"
+          Copy-Item "release/win-unpacked" "release/VaultMedic-Windows" -Recurse
+          Compress-Archive -Path "release/VaultMedic-Windows" -DestinationPath "release/VaultMedic-Windows-Unpacked-$version-x64.zip"
+          Remove-Item "release/VaultMedic-Windows" -Recurse -Force
+
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem release -File | Where-Object {
+            $_.Extension -eq ".exe" -or $_.Extension -eq ".zip"
+          } | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)"
+          }
+          $lines | Set-Content "release/SHA256SUMS.txt"
+
+      - name: Keep Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultMedic-Windows-${{ github.ref_name }}
+          path: |
+            release/*.exe
+            release/*.zip
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = Get-ChildItem release -File | Where-Object {
+            $_.Extension -eq ".exe" -or $_.Extension -eq ".zip" -or $_.Name -eq "SHA256SUMS.txt"
+          } | ForEach-Object { $_.FullName }
+          gh release create $env:GITHUB_REF_NAME $assets --generate-notes --verify-tag
