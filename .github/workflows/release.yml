@@ -21,7 +21,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npm run package:win -- --publish=never
+      - run: npm run package:win
 
       - name: Create unpacked Windows fallback
         shell: pwsh
